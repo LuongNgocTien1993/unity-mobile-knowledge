@@ -6,6 +6,54 @@ Khi áp dụng vào một dự án, đọc thêm file riêng của dự án đó
 
 ---
 
+## 0. Strip code: lỗi nguy hiểm nhất, đọc trước
+
+Strip (managed stripping / IL2CPP linker) xóa code mà Unity thấy không được gọi trực tiếp. Lỗi do strip **chỉ xuất hiện trong bản Release/IL2CPP**, Editor và Development build vẫn chạy bình thường. Nên rất dễ lọt qua test trong Editor và chỉ lộ khi phát hành.
+
+### Triệu chứng
+- Tính năng hoạt động trong Editor, hỏng trên bản release. Ví dụ: hộp thoại ATT không hiện, mua hàng không có sản phẩm, quảng cáo không load.
+- Log kiểu `No adapter for ...`, `Type not found`, `Method not found`, `NullReferenceException` ở chỗ gọi qua reflection.
+- Dữ liệu deserialize bị trống hoặc thiếu field, dù JSON vẫn đúng.
+- Lỗi chỉ xuất hiện sau khi đổi Stripping Level, bật/tắt một package, hoặc thêm một SDK.
+
+### Code thường bị strip nhầm
+- Class/assembly chỉ được đăng ký qua `RuntimeInitializeOnLoadMethod`, không có ai tham chiếu trực tiếp (ví dụ adapter quảng cáo, plugin).
+- Code gọi từ native: callback JNI (Android), callback Objective-C/Swift (iOS), delegate của SDK.
+- Gọi qua reflection: `Type.GetType("...")`, `Activator.CreateInstance`, tên type/method dạng chuỗi.
+- Type chỉ xuất hiện trong prefab, ScriptableObject hoặc Addressables, không có reference trong code.
+- Thư viện chỉ được gọi bằng tên, ví dụ khóa license key (`GooglePlayTangle`).
+
+### Cách giữ lại code
+1. **`link.xml`** (ưu tiên, dễ kiểm soát): đặt trong `Assets/` hoặc trong thư mục của package/assembly. Ví dụ:
+   ```xml
+   <linker>
+     <assembly fullname="MyAdapterAssembly" preserve="all" />
+     <assembly fullname="Assembly-CSharp">
+       <type fullname="Namespace.SomeClass" preserve="all" />
+     </assembly>
+   </linker>
+   ```
+   Dùng `preserve="all"` để giữ toàn bộ assembly/type. Có thể giới hạn xuống `preserve="fields"` hoặc `methods` nếu cần giảm kích thước.
+2. **`[Preserve]`** (`UnityEngine.Scripting`) trên class, method hoặc constructor được gọi từ native hoặc reflection.
+3. **`[assembly: AlwaysLinkAssembly]`** khi cả assembly không có reference nào trỏ tới, nhưng vẫn cần nạp lúc chạy (đăng ký qua `RuntimeInitializeOnLoadMethod`).
+4. **Tham chiếu thật từ code**: gọi một hàm của assembly đó từ chỗ khởi động. Đây là cách không phụ thuộc cấu hình, nhưng phải là code chạy thật, không phải biến không dùng.
+5. **Hạ Managed Stripping Level** (Low hoặc Minimal) để thử nghiệm và xác định nguyên nhân. Không nên giữ mức cao nếu chưa kiểm tra kỹ.
+
+### Quy tắc khi thêm SDK, plugin hoặc tính năng reflection
+- Mỗi khi thêm SDK/package/adapter có callback native, reflection hoặc đăng ký tự động: thêm `link.xml` hoặc `[Preserve]` ngay khi viết, không đợi lỗi.
+- Đừng xóa `link.xml` khi dọn project. Kiểm tra `git status` để chắc file không bị mất.
+- Sau mỗi thay đổi liên quan đến strip, build **Release IL2CPP** và chạy thử trên máy thật. Không chỉ test Development build.
+- Ghi chú trong code vì sao phải giữ (ví dụ "nothing references this assembly, IL2CPP strips it"), để người sau không xóa nhầm.
+
+### Ví dụ đã gặp (IdleGuildMaster)
+- Hộp thoại ATT không hiện trên iOS vì assembly quảng cáo bị strip. Sửa bằng `AlwaysLinkAssembly` và `[Preserve]`.
+- Adapter quảng cáo AdMob/UnityAds/AppLovin bị strip, waterfall báo `No adapter`. Sửa bằng `link.xml` với `preserve="all"`.
+- Khóa `GooglePlayTangle` bị strip, receipt validation hỏng. Sửa bằng `link.xml` trong `Assets/_Game/`.
+
+Chi tiết commit và file: xem file riêng của từng dự án.
+
+---
+
 ## 1. Quy tắc fix bug
 
 1. **Tìm nguyên nhân gốc, không vá triệu chứng.** Ví dụ: code tạo UI chỉ tồn tại trong `#if UNITY_EDITOR` làm player build lỗi. Cách sửa đúng là đưa phần runtime ra ngoài `#if`, không thêm `if` ở từng chỗ gọi.
@@ -29,10 +77,8 @@ Khi áp dụng vào một dự án, đọc thêm file riêng của dự án đó
 - **Triệu chứng:** Editor compile được, player build báo `type not found`.
 - **Cách fix:** thêm vào `references` của asmdef các assembly của nền tảng (ví dụ `Unity.Notifications.Android`, `Unity.Notifications.iOS`).
 
-### 2.3 IL2CPP strip mất code không ai gọi trực tiếp
-- **Triệu chứng:** tính năng chỉ hỏng ở release/IL2CPP, không hỏng trong Editor. Ví dụ điển hình: hộp thoại ATT iOS không hiện.
-- **Nguyên nhân:** assembly hoặc class chỉ được gọi từ native (JNI, callback iOS, plist) nên không có reference trong C#, bị strip.
-- **Cách fix:** `[assembly: AlwaysLinkAssembly]` và `[Preserve]` trên class/method được gọi từ native. Với Android, kiểm tra `link.xml`.
+### 2.3 Strip code
+- Xem **mục 0** ở đầu file. Đây là nhóm lỗi nguy hiểm nhất, và cách xử lý (link.xml, `[Preserve]`, `AlwaysLinkAssembly`) đều nằm ở đó.
 
 ### 2.4 Hook editor theo nền tảng chạy sai target
 - **Triệu chứng:** build Android chạy hook của iOS (hoặc ngược lại), ví dụ sai manifest của AdMob.
@@ -153,7 +199,7 @@ Khi áp dụng vào một dự án, đọc thêm file riêng của dự án đó
 2. Đúng môi trường (production), đúng profile Addressables, đúng Team ID (iOS).
 3. Ads ở chế độ Live.
 4. Cheat panel, debug UI, test SDK không bật trong release.
-5. Build AAB (tự tăng bundleVersionCode), kiểm tra manifest, `google-services.json`, R8 mapping upload được.
+5. Build AAB (tự tăng bundleVersionCode), kiểm tra manifest, `google-services.json`, R8 mapping upload được. Đã kiểm tra `link.xml` còn đủ, và các SDK/adapter có callback native hoặc reflection vẫn có `[Preserve]` hoặc `link.xml` (mục 0).
 6. Chạy bản release trên máy thật: intro, tutorial, mua IAP (sandbox), đăng nhập, thông báo, ATT.
 7. Sau khi upload Addressables, kiểm tra URL catalog trỏ đúng nguồn mới.
 8. Kiểm tra `git status` trước khi commit: không có keystore, secret, hoặc file build output.
