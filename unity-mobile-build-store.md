@@ -183,6 +183,7 @@ Chi tiết commit và file: xem file riêng của từng dự án.
 - **ATT:** nếu prompt không hiện, kiểm tra IL2CPP strip (mục 2.3).
 - **Screenshot cho IAP:** bắt buộc cho mọi sản phẩm, kể cả subscription.
 - **Subscription intro offer:** cấu hình trong App Store Connect nếu có.
+- **Subscription cần link Terms of Use (EULA) trong mô tả:** nếu app có auto-renewable subscription mà mô tả App Store không có link Terms of Use hoạt động, Apple dừng review với "App Review Guideline Issue" (mục 3.1.2). Dùng EULA chuẩn của Apple `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/` và thêm một dòng `Terms of Use (EULA): <link>` vào cuối mô tả của **mọi** ngôn ngữ, dịch nhãn sang ngôn ngữ đó. Đẩy qua API, không sửa tay trên web. Sau khi sửa, gửi lại bản để review.
 - **Đẩy metadata bằng App Store Connect API:** dùng key ngoài repo, script idempotent (kiểm tra trạng thái trước khi ghi).
 
 ### 6.3 Cả hai store
