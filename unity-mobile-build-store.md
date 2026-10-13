@@ -147,6 +147,15 @@ Build thành công có 0 lỗi, 5 cảnh báo (cảnh báo `android.enableJetifi
 - **Trước khi build lại sau khi lỗi:** kiểm tra không còn tiến trình `java` của Gradle giữ file trong `Library/Bee`. Nếu có, dừng daemon rồi mới build lại.
 - **Kiểm tra trước khi upload:** chạy bản release trên máy thật. Build thành công chưa đủ để chắc chắn R8 không làm hỏng code qua reflection hoặc JNI (xem mục 0).
 
+### 2.13 Crash lúc khởi động do R8 xóa constructor của Room DB (WorkManager)
+- **Triệu chứng:** app crash ngay khi mở, log báo `androidx.startup` "Failed to create an instance of WorkDatabase". Chỉ thấy ở bản release có minify, bản debug chạy bình thường.
+- **Nguyên nhân:** WorkManager dùng Room, và Room tạo `WorkDatabase_Impl` bằng reflection qua constructor không tham số. Consumer rule của Room 2.2.5 chỉ giữ class, không giữ constructor. Với R8 full mode (AGP 9, `proguard-android-optimize`), constructor bị xóa.
+- **Cách fix:** thêm rule vào `proguard-user.txt`:
+  ```
+  -keep class * extends androidx.room.RoomDatabase { <init>(); }
+  ```
+- **Quy tắc chung:** khi crash chỉ có ở release và stack trỏ tới class được tạo bằng reflection (Room, WorkManager, DI container, SDK), kiểm tra trước tiên xem constructor của class đó có bị R8 xóa không. Xem mục 0.
+
 ---
 
 ## 3. Lỗi hay gặp khi chạy trên thiết bị
