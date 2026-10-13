@@ -122,6 +122,31 @@ Chi tiết commit và file: xem file riêng của từng dự án.
 - Unity không lưu mật khẩu keystore giữa các lần mở Editor. Có thể lưu tạm trong EditorPrefs (chỉ làm nhẹ, không phải mã hóa), và nhập lại nếu build báo sai mật khẩu.
 - **Không commit keystore vào git.** Đây là khóa ký release. Nếu bị lộ, người khác có thể ký app giả.
 
+### 2.12 R8 và Gradle / Android Gradle Plugin 9.x (Unity 6)
+- **Bối cảnh:** Play Console cảnh báo "R8 chưa được bật", "rút gọn tài nguyên chưa được bật", và "nâng AGP lên 9.0 trở lên". Muốn sửa phải làm trong Gradle template, Unity Player Settings không đủ.
+- **Gradle:** AGP 9.x cần Gradle 9.1 trở lên. Unity 6.3 đi kèm Gradle 8.13, không đủ. Tải Gradle chính thức từ `services.gradle.org`, kiểm tra SHA-256 theo file `.sha256` cạnh đó, rồi trỏ Unity tới thư mục đó: `Preferences > External Tools > Gradle` (API: `AndroidExternalToolsSettings.gradlePath`).
+  - Đây là cài đặt theo từng máy. Mỗi máy build và CI phải làm lại, nếu không build sẽ dùng Gradle 8.13 và lỗi.
+  - JDK: Gradle 9 chạy được với OpenJDK 17 đi kèm Unity (`PlaybackEngines/AndroidPlayer/OpenJDK`, 17.0.9).
+- **Template:** AGP đặt ở `baseProjectTemplate.gradle`, ví dụ `id 'com.android.application' version '9.4.1' apply false`. Đặt cùng phiên bản cho `com.android.library`.
+- **Release:** `minifyRelease` bật trong Player Settings. `shrinkResources` không có trong Player Settings, phải thêm vào `launcherTemplate.gradle`, trong `buildTypes.release`: `shrinkResources **MINIFY_RELEASE**`. Dùng cùng cờ với `minifyEnabled` để tắt minify thì không bị lỗi build.
+
+#### Thống kê 4 lần build release (dự án IdleGuildMaster, Unity 6.3 LTS 6000.3.11f1, AGP 9.4.1, Gradle 9.8.1)
+
+| # | Kết quả | Lỗi | Nguyên nhân | Cách sửa |
+|---|---|---|---|---|
+| 1 | Failed (533 s) | `getDefaultProguardFile('proguard-android.txt') is no longer supported` | AGP 9 không còn hỗ trợ file này. Nó có `-dontoptimize`, chặn R8 tối ưu | Đổi sang `proguard-android-optimize.txt` ở `buildTypes` debug và release |
+| 2 | Failed (633 s) | `Global keep option -ignorewarnings was specified as a consumerProguardFile ... proguard-unity.txt` | File `proguard-unity.txt` do Unity sinh ra có `-ignorewarnings`. AGP 9 không cho phép trong consumer rule | Chép các rule keep của file đó (bỏ `-ignorewarnings`) vào `proguard-user.txt`. Thêm `afterEvaluate { android.defaultConfig.consumerProguardFiles.removeIf { it.name == 'proguard-unity.txt' } }` vào `mainTemplate.gradle` |
+| 3 | Failed (459 s) | `Unable to delete directory ... minifyReleaseWithR8 ... classes.dex` | Gradle daemon từ build trước vẫn giữ file mở | Chạy `gradle --stop`, dừng tiến trình `java` của daemon, xóa thư mục `Library/Bee/.../launcher/build` |
+| 4 | Succeeded (460 s) | — | — | — |
+
+Build thành công có 0 lỗi, 5 cảnh báo (cảnh báo `android.enableJetifier=true` đã deprecated, sẽ bị bỏ ở AGP 10).
+
+#### Ghi chú khi áp dụng
+- **Khi Unity sinh `proguard-unity.txt` mới:** so lại với bản đã chép trong `proguard-user.txt`. Các rule keep của Unity player (`GameActivity`, `com.unity3d.player`...) phải còn đủ, nếu không bản release có thể crash.
+- **Bản sửa cho consumer rule:** không bỏ hẳn `proguard-unity.txt` mà không chép rule. File đó chứa rule keep cần cho Unity player.
+- **Trước khi build lại sau khi lỗi:** kiểm tra không còn tiến trình `java` của Gradle giữ file trong `Library/Bee`. Nếu có, dừng daemon rồi mới build lại.
+- **Kiểm tra trước khi upload:** chạy bản release trên máy thật. Build thành công chưa đủ để chắc chắn R8 không làm hỏng code qua reflection hoặc JNI (xem mục 0).
+
 ---
 
 ## 3. Lỗi hay gặp khi chạy trên thiết bị
