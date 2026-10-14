@@ -34,6 +34,7 @@ Strip (managed stripping / IL2CPP linker) xóa code mà Unity thấy không đư
    </linker>
    ```
    Dùng `preserve="all"` để giữ toàn bộ assembly/type. Có thể giới hạn xuống `preserve="fields"` hoặc `methods` nếu cần giảm kích thước.
+   Assembly chỉ có khi có define (ví dụ adapter của một mạng quảng cáo) thì thêm `ignoreIfMissing="1"`, nếu không link có thể báo lỗi khi define đó không được đặt.
 2. **`[Preserve]`** (`UnityEngine.Scripting`) trên class, method hoặc constructor được gọi từ native hoặc reflection.
 3. **`[assembly: AlwaysLinkAssembly]`** khi cả assembly không có reference nào trỏ tới, nhưng vẫn cần nạp lúc chạy (đăng ký qua `RuntimeInitializeOnLoadMethod`).
 4. **Tham chiếu thật từ code**: gọi một hàm của assembly đó từ chỗ khởi động. Đây là cách không phụ thuộc cấu hình, nhưng phải là code chạy thật, không phải biến không dùng.
@@ -48,6 +49,7 @@ Strip (managed stripping / IL2CPP linker) xóa code mà Unity thấy không đư
 ### Ví dụ đã gặp (IdleGuildMaster)
 - Hộp thoại ATT không hiện trên iOS vì assembly quảng cáo bị strip. Sửa bằng `AlwaysLinkAssembly` và `[Preserve]`.
 - Adapter quảng cáo AdMob/UnityAds/AppLovin bị strip, waterfall báo `No adapter`. Sửa bằng `link.xml` với `preserve="all"`.
+- Horror Clown (cùng lỗi): `Assets/link.xml` chỉ có `GooglePlayTangle`, nên log báo `No adapter for 'admob'` / `'unityads'`. Sửa bằng cách thêm `IdleToolkit.Ads.AdMob`, `IdleToolkit.Ads.UnityAds`, `IdleToolkit.Ads.AppLovin` với `ignoreIfMissing="1"`. Cùng lúc phát hiện `AddressableAssetsData/link.xml` bị mất khỏi ổ đĩa trong khi vẫn được track trong git: khôi phục từ git, không để Unity/IDE xóa.
 - Khóa `GooglePlayTangle` bị strip, receipt validation hỏng. Sửa bằng `link.xml` trong `Assets/_Game/`.
 
 Chi tiết commit và file: xem file riêng của từng dự án.
