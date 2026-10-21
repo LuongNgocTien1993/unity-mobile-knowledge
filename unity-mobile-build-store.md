@@ -174,6 +174,8 @@ Build thành công có 0 lỗi, 5 cảnh báo (cảnh báo `android.enableJetifi
 | Hộp thoại quyền thông báo không hiện | Hỏi quyền khi app đang nền | Chỉ hỏi khi app ở foreground, vào thời điểm hợp lý trong flow |
 | Màn hình tự tắt giữa chừng | Màn hình tự khóa | Bật `Screen.sleepTimeout = SleepTimeout.NeverSleep` khi đang chơi |
 | Ký tự hiện thành ô vuông | Font không có glyph (ví dụ `−` Unicode) | Dùng ký tự ASCII hoặc thêm glyph vào font |
+| Nút debug/cheat vẽ bằng IMGUI (`OnGUI`) chạy được trong Editor và bản PC nhưng bấm không ăn trên Android, trong khi uGUI vẫn nhận chạm | Project dùng Input System (activeInputHandler Both), IMGUI không nhận touch trên Android | Dựng panel debug bằng uGUI (Canvas overlay riêng, sortingOrder cao, nền tối nhận raycast để chặn UI bên dưới); thử trên giả lập hoặc máy thật trước khi báo xong |
+| Số thập phân dính nhau ("0.18" thành "0]8") hoặc khoảng cách chữ lạ trên mọi chữ TMP | Font asset TMP còn bảng kerning (`m_GlyphPairAdjustmentRecords`) của một bản TTF khác, áp nhầm cặp glyph | Xóa bảng đó trong `.asset` để TMP nạp lại từ GPOS của TTF hiện tại; không vá bằng cách chèn khoảng trắng vào chuỗi |
 | Kéo để scroll lại kích hoạt tap | Không chặn tap khi đang drag | Chặn tap khi đã vượt ngưỡng drag |
 | Save cũ không load được | Migration bị bỏ hoặc sai | Backup save cũ, chỉ load schema hiện tại, ghi rõ trạng thái cho người dùng |
 | Mất progress, cloud conflict sai | So sánh timestamp sau khi đã cập nhật | So sánh timestamp trước khi áp dụng thay đổi |
@@ -187,6 +189,12 @@ Build thành công có 0 lỗi, 5 cảnh báo (cảnh báo `android.enableJetifi
 - **Art AI trộn nhân vật hoặc lỗi:** kiểm tra mắt bằng QA trước khi commit. Giữ art cũ cho đến khi art mới được duyệt.
 - **Nền đen trên icon:** xóa nền trước khi import.
 - **Crop sai khi resize:** khôi phục kích thước trước khi crop, không crop chồng lên bản đã crop.
+- **Sprite UI cắt từ ảnh AI mất viền một cạnh, dính mảnh hàng xóm, hoặc còn vệt nền ngoài viền:** chạy lint tự động (`sprite_lint.py` của skill unity-ui-pipeline) ở bước đưa sprite vào project và trong lệnh test. Chi tiết ở `unity-ui-from-ai-mockup.md` mục 6b.
+
+### Chạy thử nhanh không cần điện thoại
+- **Giả lập BlueStacks 5:** adb đi kèm `C:\Program Files\BlueStacks_nxt\HD-Adb.exe` (thiết bị `emulator-5554`). `install -r <apk>`, mở app bằng `shell monkey -p <package> -c android.intent.category.LAUNCHER 1`, chụp màn bằng `exec-out screencap -p > shot.png`, chạm bằng `shell input tap x y` (tọa độ theo độ phân giải giả lập, ví dụ 1080×1920). adb của BlueStacks khác phiên bản adb của SDK: lệnh đầu sẽ giết và khởi động lại server, việc này bình thường.
+- **Chụp bản build PC tự động:** build Windows (Mono, cửa sổ `-screen-width 540 -screen-height 1170 -screen-fullscreen 0`), thêm tham số dòng lệnh riêng (ví dụ `-cheatshot <dir>`) để game tự mở màn cần xem, chụp rồi `Application.Quit()`. Nếu project tắt module ScreenCapture thì chụp bằng `WaitForEndOfFrame` + `Texture2D.ReadPixels`. Bản Development hiện console lỗi đè lên màn; chụp bằng bản thường.
+- Gọi Unity batchmode bằng `Start-Process ... -Wait`: gọi trực tiếp `& Unity.exe` trong PowerShell có lần trả về trước khi build xong, nên bước sau chạy với exe cũ.
 
 ---
 
