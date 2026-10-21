@@ -63,6 +63,20 @@ Không cắt thẳng được vì phần tử chồng nhau (nhân vật che góc
 - Chụp thêm 590/860/960 px rộng và kiểm không phần tử nào ra ngoài canvas; phần dùng chung (thanh tab) phải trùng hộp giữa các màn.
 - Lặp sửa tới khi chỉ còn mục có lý do. Người duyệt cuối xem ảnh ghép mockup | game của mọi trạng thái, rồi Play mode.
 
+## 6b. Lỗi mà gate hộp không thấy (đã lọt tới máy người chơi)
+Gate ở mục 6 so HỘP, nên sprite cắt hỏng mà hộp vẫn đúng thì vẫn qua. Ảnh 720 thu nhỏ và soi mép bằng mắt cũng bỏ sót. Lần chạy Jelly Cut, người dùng thấy trên điện thoại hai nút mất viền trên và tab đang chọn lòi "tai" vuông; quét lại tìm thêm 15 sprite cùng loại.
+- **Ba lỗi cắt và cách đo tự động** (script `sprite_lint.py` trong skill unity-ui-pipeline):
+  - *rim, mất viền một cạnh*: mỗi cạnh lấy luma tối nhất trong 8 px sát mép bóng, trung vị trên 40% đường quét giữa. Có ≥ 2 cạnh tối (< 90) mà một cạnh > max(110, 2.5× trung vị cạnh tối) là thiếu viền. Gốc thường là hộp px cắt tay sát mép (bắt đầu y = 900, viền ở 897): luôn chừa ≥ 20 px rồi trim theo alpha.
+  - *fringe, mảnh nền sót ngoài viền*: vùng trong viền = tô kín thành phần tối lớn nhất; đếm pixel đục nằm ngoài vùng đó nở 2 px. Sửa bằng cách cắt alpha theo vùng đó (biên mềm).
+  - *notch, khung lõm vào*: mép trái/phải/trên/dưới của bóng so với bao lồi của chính nó; khung (pill, chip, ô, tab, thẻ) mà lõm > 4 px là dính mảnh hàng xóm.
+  - Ca cố ý (sóng âm rời, nhân vật không viền kín, quầng sáng) ghi vào allow.json kèm lý do; lint chạy cuối bước chép sprite (fail thì dừng) và trong lệnh test.
+- **Sửa ở script cắt, rồi chạy lại cả chuỗi**, không vá PNG trong `Assets/`; diff kết quả với bản sao lưu để chắc chỉ đổi đúng sprite cần đổi.
+  - Ô dính đỉnh hai ô bên: khớp một cung tròn (Kasa least squares) vào góc bo ở phần hàng sạch phía trên, kéo dài xuống cạnh thẳng, cắt mọi thứ ngoài đường đó. Dò viền theo từng hàng thất bại vì đường viền ngang của ô bên cạnh nối liền vào viền ô chính.
+  - Dải lem màu nền key (đỏ tím) bám ngoài viền nâu: quét từ hai đầu mỗi hàng/cột, xóa pixel "sáng hoặc b > g" cho tới khi gặp viền; giữ viền tối đỏ tím (luma < 70) không bị xóa nhầm.
+  - Mảnh plate mất viền mà các mảnh anh em cùng hình còn tốt: dựng lại từ mảnh tốt bằng đổi hue, rồi chỉnh S và V theo trung vị của mảnh gốc (chỉ đổi hue thì màu ra nhạt).
+- **Kerning TMP sai cặp**: số "0.18" hiện "0]8" trên mọi chữ, trước đó bị vá bằng cách chèn khoảng trắng ở vài nhãn. Gốc: font asset giữ `m_GlyphPairAdjustmentRecords` sinh từ một bản TTF khác (thứ tự glyph khác) nên kerning áp nhầm cặp (period→one −0.244 em). Đổi TTF thì xóa bảng đó để TMP nạp lại từ GPOS của TTF đang dùng; kiểm bằng fontTools (số cặp, glyph đầu cặp). Render chuỗi bằng PIL từ chính TTF để biết lỗi do font hay do TMP. Thêm lookup GPOS mới không đè được bản ghi cũ đã có trong asset.
+- **Soát bố cục ở tỉ lệ thật**: render mọi màn ở 1080×2400 (20:9) và 590/860/960×1280, rồi giao một agent đọc TỪNG ảnh ở cỡ thật theo checklist (sprite, chữ tràn/đè, phần tử đè nhau, lệch tâm, đồng nhất giữa màn). Đợt này tìm ra 17 mục mà gate hộp bỏ qua: chữ trên thẻ bị thanh đè ở 20:9, lưới lệch trái ở màn rộng, nhãn lệch tâm khi nút tắt ẩn icon, hai nút cạnh nhau khác cỡ chữ vì autosize riêng (cho dùng chung cỡ nhỏ hơn), toast gợi ý sót lại khi về Home.
+
 ## 7. Tổ chức việc với nhiều agent
 - Hợp đồng: agent đọc code (rẻ) song song theo nhóm màn.
 - Code: chia track KHÔNG chung file, viết song song KHÔNG compile, một lần compile chung (Unity khóa project). Mỗi track ghi "điều kiện JSON" ra file để agent dữ liệu sinh JSON mà không đọc code.
