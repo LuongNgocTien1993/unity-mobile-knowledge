@@ -162,6 +162,8 @@ Build thành công có 0 lỗi, 5 cảnh báo (cảnh báo `android.enableJetifi
 
 ## 3. Lỗi hay gặp khi chạy trên thiết bị
 
+Crash, ANR và đơ game trên máy thật (nguyên nhân, cách fix, checklist phòng tránh): xem [unity-mobile-crash-anr.md](unity-mobile-crash-anr.md).
+
 | Triệu chứng | Nguyên nhân thường gặp | Cách fix |
 |---|---|---|
 | Màn hình intro "đứng", không bấm được | Debug OnGUI che và nuốt touch | Chỉ bật debug UI trong Editor hoặc Development build |
